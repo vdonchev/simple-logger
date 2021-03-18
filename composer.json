@@ -1,0 +1,23 @@
+{
+    "name": "donchev/simple-logger",
+    "description": "A simple logger for PHP projects",
+    "keywords": ["simple-logger", "logger", "log"],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "donchev",
+            "email": "c0nt4c7@gmail.com"
+        }
+    ],
+    "require": {
+        "psr/log": "^1.1",
+        "ext-json": "*",
+        "php": ">=7.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Donchev\\Log\\": "src"
+        }
+    }
+}
