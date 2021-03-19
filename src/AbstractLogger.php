@@ -2,9 +2,11 @@
 
 namespace Donchev\Log;
 
+use DateTime;
 use Exception;
 use Psr\Log\InvalidArgumentException;
 use Psr\Log\LogLevel;
+use RuntimeException;
 
 abstract class AbstractLogger extends \Psr\Log\AbstractLogger
 {
@@ -51,87 +53,129 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
         $this->validateLevelName($minLevel);
 
         $this->minLevel = $minLevel;
+
+        $config = array_intersect_key($config, self::CONFIG);
         $this->config = array_merge(self::CONFIG, $config);
     }
 
     public function log($level, $message, array $context = [])
     {
-        if ($line = $this->build($level, $message, $context)) {
+        $this->validateLevelName($level);
+
+        if (!$this->minLevelReached($level)) {
+            return null;
+        }
+
+        $context = $this->validateContextExceptions($context);
+
+        $message = $this->interpolate($message, $context);
+
+        if ($line = $this->formatLine($level, $message, $context)) {
             $this->write($line);
         }
     }
 
     /**
-     * Return log line ready for print
-     *
-     * @param string $level
-     * @param string $message
-     * @param array $context
-     * @return string|null
-     */
-    protected function build(string $level, string $message, array $context): ?string
-    {
-        if (!$this->validateMinLevel($level)) {
-            return null;
-        }
-
-        $message = $this->buildMessage($level, $message, $context);
-        $context = $this->buildContext($context);
-
-        return $this->formatLine($level, $message, $context);
-    }
-
-    /**
-     * Return message string ready for print
-     *
-     * @param string $level
-     * @param string $message
-     * @param array $context
-     * @return string
-     */
-    protected function buildMessage(string $level, string $message, array $context): string
-    {
-        $this->validateLevelName($level);
-
-        return $this->interpolate($message, $context);
-    }
-
-    /**
-     * Return context array ready for print
+     * If an Exception object is passed in the context data, it MUST be in the 'exception' key.
+     * If Exception object is not in 'exception' key a RuntimeException is thrown.
      *
      * @param array $context
      * @return array
      */
-    protected function buildContext(array $context): array
+    protected function validateContextExceptions(array $context): array
     {
-        if ($this->configIncludeContext() === false) {
-            return $context;
-        }
-
-        foreach ($context as $key => $msg) {
-            /** String */
-            if (!is_object($msg)) {
-                continue;
-            }
-
-            /** Exception */
-            if ($key === 'exception' && is_subclass_of($msg, Exception::class)) {
-                if ($this->configStackTrace()) {
-                    $context[$key] = $msg->__toString();
-                } else {
-                    $context[$key] = get_class($msg) . ': ' . $msg->getMessage();
+        foreach ($context as $key => $value) {
+            if (is_object($value)
+                && (get_class($value) === Exception::class || is_subclass_of($value, Exception::class))) {
+                if ($key !== 'exception') {
+                    throw new RuntimeException(
+                        "If an Exception object is passed in the context data, it MUST be in the 'exception' key."
+                    );
                 }
 
-                continue;
-            }
-
-            /** Object that implements __toString */
-            if (method_exists($msg, '__toString')) {
-                $context[$key] = $msg->__toString();
+                if (!$this->configStackTrace()) {
+                    $context[$key] = $this->getExceptionName($value);
+                }
             }
         }
 
         return $context;
+    }
+
+    /**
+     * Return a short string representation of an Exception object.
+     *
+     * @param Exception $exception
+     * @return string
+     */
+    protected function getExceptionName(Exception $exception): string
+    {
+        $text = get_class($exception) . ' Object';
+        if ($exception->getMessage() != '') {
+            $text .= ' (Message: ' . $exception->getMessage() . ')';
+        }
+
+        return $text;
+    }
+
+    /**
+     * Return log line string ready for print
+     *
+     * @param $level
+     * @param $message
+     * @param array $context
+     * @param DateTime|null $date
+     * @return string
+     */
+    protected function formatLine($level, $message, array $context, ?DateTime $date = null): string
+    {
+        $timestamp = $date ? $date->format($this->configDateFormat()) : date($this->configDateFormat());
+
+        $line = [
+            'timestamp' => $timestamp,
+            'level' => strtoupper($level),
+            'message' => $message,
+            'context' => $context
+        ];
+
+        if ($this->configLogJson()) {
+            return $this->formatLineAsJson($line);
+        }
+
+        return $this->formatLineAsString($line);
+    }
+
+    /**
+     * Return ready for print log line in json format using json_encode()
+     *
+     * @param array $items
+     * @return string
+     */
+    protected function formatLineAsJson(array $items): string
+    {
+        if (!$this->configIncludeContext()) {
+            unset($items['context']);
+        }
+
+        return json_encode($items);
+    }
+
+    /**
+     * Return ready for print log line
+     *
+     * @param array $items
+     * @return string
+     */
+    protected function formatLineAsString(array $items): string
+    {
+        if (!$this->configIncludeContext() || !$items['context']) {
+            $items['context'] = '';
+        } else {
+            $items['context'] = trim(print_r($items['context'], true));
+            $items['context'] = PHP_EOL . preg_replace('/Array/i', 'Context:', $items['context'], 1);
+        }
+
+        return vsprintf($this->configLineFormat(), $items);
     }
 
     /**
@@ -153,51 +197,13 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
         return strtr($message, $replace);
     }
 
-
-    /**
-     * Return log line string ready for print
-     *
-     * @param $level
-     * @param $message
-     * @param array $context
-     * @return string
-     */
-    protected function formatLine($level, $message, array $context): string
-    {
-        $timestamp = date($this->configDateFormat());
-
-        $logLine = [
-            'time' => $timestamp,
-            'level' => strtoupper($level),
-            'message' => $message,
-            'context' => $context
-        ];
-
-        if ($this->configLogJson()) {
-            if (!$this->configIncludeContext()) {
-                unset($logLine['context']);
-            }
-
-            return json_encode($logLine);
-        }
-
-        if (!$this->configIncludeContext() || !$logLine['context']) {
-            $logLine['context'] = '';
-        } else {
-            $context = trim(print_r($context, true));
-            $logLine['context'] = PHP_EOL . preg_replace('/Array/i', 'Context:', $context, 1);
-        }
-
-        return vsprintf($this->configLineFormat(), $logLine);
-    }
-
     /**
      * Return true if current log level is equal or higher than min log level
      *
      * @param string $level
      * @return bool
      */
-    protected function validateMinLevel(string $level): bool
+    protected function minLevelReached(string $level): bool
     {
         return self::LOG_LEVEL[strtolower($level)] >= self::LOG_LEVEL[strtolower($this->minLevel)];
     }
