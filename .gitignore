@@ -2,3 +2,4 @@
 /vendor
 *.log
 composer.lock
+.phpunit.result.cache
