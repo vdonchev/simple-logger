@@ -4,7 +4,7 @@ use Donchev\Log\AbstractLogger;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 
-class AbstractLoggerTests extends TestCase
+class AbstractLoggerTest extends TestCase
 {
     protected static function getMethod(string $name): ReflectionMethod
     {
