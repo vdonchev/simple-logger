@@ -103,6 +103,30 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
+    public function getMessageArrayForOneLineLog(): array
+    {
+        return [
+            [
+                [
+                    'timestamp' => '2021-03-19 13:21:48 CET',
+                    'level' => strtoupper(LogLevel::DEBUG),
+                    'message' => 'Some Message',
+                    'context' => [1, 2, 3]
+                ],
+                '"[2021-03-19 13:21:48 CET] [DEBUG]: Some Message [1,2,3]"'
+            ],
+            [
+                [
+                    'timestamp' => '2021-03-19 13:21:48 CET',
+                    'level' => strtoupper(LogLevel::INFO),
+                    'message' => 'Message',
+                    'context' => ['key' => 'value']
+                ],
+                '"[2021-03-19 13:21:48 CET] [INFO]: Message {\"key\":\"value\"}"'
+            ],
+        ];
+    }
+
     public function getMessageArrayForJson(): array
     {
         return [
@@ -344,6 +368,18 @@ class AbstractLoggerTest extends TestCase
     public function testFormatLineAsString($line, $output)
     {
         $logger = $this->getAbstractLogger();
+        $formatLineAsString = $this->getMethod('formatLineAsString');
+
+        $res = $formatLineAsString->invokeArgs($logger, [$line]);
+
+        $this->assertEquals($output, json_encode($res));
+    }
+    /**
+     * @dataProvider getMessageArrayForOneLineLog
+     */
+    public function testFormatLineAsStringWhenOneLineLogIsTrue($line, $output)
+    {
+        $logger = $this->getAbstractLogger(null, ['one_line_log' => true]);
         $formatLineAsString = $this->getMethod('formatLineAsString');
 
         $res = $formatLineAsString->invokeArgs($logger, [$line]);
