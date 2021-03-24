@@ -17,6 +17,7 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
         'include_context' => true,
         'log_json' => false,
         'include_stack_trace' => true,
+        'one_line_log' => false,
     ];
 
     private const LOG_LEVEL = [
@@ -171,8 +172,12 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
         if (!$this->configIncludeContext() || !$items['context']) {
             $items['context'] = '';
         } else {
-            $items['context'] = trim(print_r($items['context'], true));
-            $items['context'] = PHP_EOL . preg_replace('/Array/i', 'Context:', $items['context'], 1);
+            if ($this->configOneLineLog()) {
+                $items['context'] = json_encode($items['context']);
+            } else {
+                $items['context'] = trim(print_r($items['context'], true));
+                $items['context'] = PHP_EOL . preg_replace('/Array/i', 'Context:', $items['context'], 1);
+            }
         }
 
         return vsprintf($this->configLineFormat(), $items);
@@ -278,6 +283,16 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
     protected function configStackTrace(): bool
     {
         return $this->config['include_stack_trace'];
+    }
+
+    /**
+     * Return 'one_line_log' option value
+     *
+     * @return bool
+     */
+    protected function configOneLineLog(): bool
+    {
+        return $this->config['one_line_log'];
     }
 
     /**
