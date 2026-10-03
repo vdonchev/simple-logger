@@ -2,7 +2,7 @@
 
 ## Compatibility and setup
 
-- This is a Composer library: `Donchev\Log\` autoloads from `src/`. Keep library code compatible with PHP 7.1 and `psr/log` 1.x; the PHPUnit 9 development dependency requires PHP 7.3+.
+- This is a Composer library: `Donchev\Log\` autoloads from `src/`. Keep library code compatible with PHP 8.4.1 and `psr/log` 3.x; tests use PHPUnit 13.
 - Install development dependencies with `composer install`. `composer.lock` is intentionally ignored, so a local lockfile is not a repository-wide dependency pin.
 
 ## Verification
@@ -12,9 +12,9 @@ Run from the repository root; `phpunit.xml` loads `vendor/autoload.php` and disc
 - Full suite: `vendor/bin/phpunit`.
 - Single file: `vendor/bin/phpunit tests/AbstractLoggerTest.php`.
 - Single method (including its data sets): `vendor/bin/phpunit --filter 'AbstractLoggerTest::testFormatLineAsStringWhenOneLineLogIsTrue' tests/AbstractLoggerTest.php`.
-- Add `--do-not-cache-result` to avoid updating the local PHPUnit cache. There are no configured Composer scripts, lint, formatter, or static-analysis commands.
-- Known Linux baseline: both data sets of `testFormatLineAsString` fail because fixtures in `getMessageArray()` expect `\r\n` before `Context:`, while production uses `PHP_EOL` (`\n` on Linux). Do not infer a regression from these failures alone.
-- Existing tests mock `AbstractLogger` and invoke protected helpers through reflection; they do not exercise concrete logger I/O.
+- Add `--do-not-record-test-run-history` to avoid updating local PHPUnit test history; `--do-not-cache-result` is deprecated in PHPUnit 13. There are no configured Composer scripts, lint, formatter, or static-analysis commands.
+- Test data providers must be public static methods referenced by `#[DataProvider(...)]`; PHPUnit 13 does not use the old `@dataProvider` annotations.
+- Existing tests instantiate a no-op subclass of `AbstractLogger` and invoke protected helpers through reflection; they do not exercise concrete logger I/O. Multiline fixtures use `PHP_EOL` before `Context:` to match the formatter across platforms.
 
 ## Implementation gotchas
 

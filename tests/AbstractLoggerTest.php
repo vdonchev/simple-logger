@@ -1,6 +1,7 @@
 <?php
 
 use Donchev\Log\AbstractLogger;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 
@@ -10,12 +11,11 @@ class AbstractLoggerTest extends TestCase
     {
         $class = new ReflectionClass(AbstractLogger::class);
         $method = $class->getMethod($name);
-        $method->setAccessible(true);
 
         return $method;
     }
 
-    public function getLevels(): array
+    public static function getLevels(): array
     {
         $levels = new ReflectionClass(LogLevel::class);
         $levels = $levels->getConstants();
@@ -28,7 +28,7 @@ class AbstractLoggerTest extends TestCase
         return $items;
     }
 
-    public function getMessagesWithoutPlaceholders(): array
+    public static function getMessagesWithoutPlaceholders(): array
     {
         return [
             ["Are you opening {{{{ the door?"],
@@ -44,7 +44,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    public function getMessagesWithPlaceholders(): array
+    public static function getMessagesWithPlaceholders(): array
     {
         return [
             ["Are you opening {key} the door?", "Are you opening key the door?"],
@@ -63,7 +63,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    public function getContextWithInvalidExceptions(): array
+    public static function getContextWithInvalidExceptions(): array
     {
         return [
             [['not_exception_key' => new InvalidArgumentException()], RuntimeException::class],
@@ -71,7 +71,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    public function getContextWithValidExceptions(): array
+    public static function getContextWithValidExceptions(): array
     {
         return [
             [['exception' => new InvalidArgumentException()]],
@@ -79,7 +79,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    public function getMessageArray(): array
+    public static function getMessageArray(): array
     {
         return [
             [
@@ -89,7 +89,8 @@ class AbstractLoggerTest extends TestCase
                     'message' => 'Some Message',
                     'context' => [1, 2, 3]
                 ],
-                '"[2021-03-19 13:21:48 CET] [DEBUG]: Some Message \r\nContext:\n(\n    [0] => 1\n    [1] => 2\n    [2] => 3\n)"'
+                json_encode('[2021-03-19 13:21:48 CET] [DEBUG]: Some Message ' . PHP_EOL
+                    . "Context:\n(\n    [0] => 1\n    [1] => 2\n    [2] => 3\n)")
             ],
             [
                 [
@@ -98,12 +99,13 @@ class AbstractLoggerTest extends TestCase
                     'message' => 'Message',
                     'context' => ['key' => 'value']
                 ],
-                '"[2021-03-19 13:21:48 CET] [INFO]: Message \r\nContext:\n(\n    [key] => value\n)"'
+                json_encode('[2021-03-19 13:21:48 CET] [INFO]: Message ' . PHP_EOL
+                    . "Context:\n(\n    [key] => value\n)")
             ],
         ];
     }
 
-    public function getMessageArrayForOneLineLog(): array
+    public static function getMessageArrayForOneLineLog(): array
     {
         return [
             [
@@ -127,7 +129,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    public function getMessageArrayForJson(): array
+    public static function getMessageArrayForJson(): array
     {
         return [
             [
@@ -151,9 +153,7 @@ class AbstractLoggerTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider getLevels
-     */
+    #[DataProvider('getLevels')]
     public function testValidateLevelNameWithCorrectLevels($level)
     {
         $logger = $this->getAbstractLogger();
@@ -162,9 +162,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertNull($validateMinLevel->invokeArgs($logger, [$level]));
     }
 
-    /**
-     * @dataProvider getLevels
-     */
+    #[DataProvider('getLevels')]
     public function testValidateLevelNameWithCorrectLevelsIncorrectCasing($level)
     {
         $logger = $this->getAbstractLogger();
@@ -176,9 +174,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertNull($validateMinLevel->invokeArgs($logger, [$level]));
     }
 
-    /**
-     * @dataProvider getLevels
-     */
+    #[DataProvider('getLevels')]
     public function testValidateLevelNameWithIncorrectLevel($level)
     {
         $logger = $this->getAbstractLogger();
@@ -212,9 +208,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertTrue($validateMinLevel->invokeArgs($logger, [LogLevel::EMERGENCY]));
     }
 
-    /**
-     * @dataProvider getMessagesWithoutPlaceholders
-     */
+    #[DataProvider('getMessagesWithoutPlaceholders')]
     public function testInterpolateWithNoPlaceholdersAndNoContext($message)
     {
         $logger = $this->getAbstractLogger();
@@ -225,9 +219,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($message, $interpolatedMessage);
     }
 
-    /**
-     * @dataProvider getMessagesWithoutPlaceholders
-     */
+    #[DataProvider('getMessagesWithoutPlaceholders')]
     public function testInterpolateWithNoPlaceholdersAndContext($message)
     {
         $logger = $this->getAbstractLogger();
@@ -238,10 +230,8 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($message, $interpolatedMessage);
     }
 
-    /**
-     * @dataProvider getMessagesWithPlaceholders
-     */
-    public function testInterpolateWithPlaceholdersAndNoContext($message)
+    #[DataProvider('getMessagesWithPlaceholders')]
+    public function testInterpolateWithPlaceholdersAndNoContext($message, $_expected)
     {
         $logger = $this->getAbstractLogger();
         $interpolate = $this->getMethod('interpolate');
@@ -251,9 +241,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($message, $interpolatedMessage);
     }
 
-    /**
-     * @dataProvider getMessagesWithPlaceholders
-     */
+    #[DataProvider('getMessagesWithPlaceholders')]
     public function testInterpolateWithPlaceholdersAndContext($message, $expected)
     {
         $logger = $this->getAbstractLogger();
@@ -325,9 +313,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals([1, $now], $res);
     }
 
-    /**
-     * @dataProvider getContextWithInvalidExceptions
-     */
+    #[DataProvider('getContextWithInvalidExceptions')]
     public function testValidateContextExceptionsWithExceptionsThatAreNotUnderExceptionKey($context, $expected)
     {
         $logger = $this->getAbstractLogger();
@@ -337,9 +323,7 @@ class AbstractLoggerTest extends TestCase
         $validateContextExceptions->invokeArgs($logger, [$context]);
     }
 
-    /**
-     * @dataProvider getContextWithValidExceptions
-     */
+    #[DataProvider('getContextWithValidExceptions')]
     public function testValidateContextExceptionsWithExceptions($context)
     {
         $logger = $this->getAbstractLogger();
@@ -349,9 +333,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($context, $res);
     }
 
-    /**
-     * @dataProvider getMessageArrayForJson
-     */
+    #[DataProvider('getMessageArrayForJson')]
     public function testFormatLineAsJson($line, $output)
     {
         $logger = $this->getAbstractLogger();
@@ -362,9 +344,7 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($output, $res);
     }
 
-    /**
-     * @dataProvider getMessageArray
-     */
+    #[DataProvider('getMessageArray')]
     public function testFormatLineAsString($line, $output)
     {
         $logger = $this->getAbstractLogger();
@@ -374,9 +354,7 @@ class AbstractLoggerTest extends TestCase
 
         $this->assertEquals($output, json_encode($res));
     }
-    /**
-     * @dataProvider getMessageArrayForOneLineLog
-     */
+    #[DataProvider('getMessageArrayForOneLineLog')]
     public function testFormatLineAsStringWhenOneLineLogIsTrue($line, $output)
     {
         $logger = $this->getAbstractLogger(null, ['one_line_log' => true]);
@@ -387,11 +365,38 @@ class AbstractLoggerTest extends TestCase
         $this->assertEquals($output, json_encode($res));
     }
 
-    protected function getAbstractLogger(string $level = null, array $config = []): AbstractLogger
+    public function testLogAcceptsStringableMessage()
     {
-        return $this->getMockForAbstractClass(
-            AbstractLogger::class,
-            [$level ?? LogLevel::DEBUG, $config]
-        );
+        $logger = new class(LogLevel::DEBUG, ['log_json' => true]) extends AbstractLogger {
+            public array $lines = [];
+
+            protected function write(string $line)
+            {
+                $this->lines[] = $line;
+            }
+        };
+        $message = new class implements Stringable {
+            public function __toString(): string
+            {
+                return 'Hello {name}';
+            }
+        };
+
+        $logger->info($message, ['name' => 'World']);
+
+        $this->assertCount(1, $logger->lines);
+        $line = json_decode($logger->lines[0], true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('INFO', $line['level']);
+        $this->assertSame('Hello World', $line['message']);
+        $this->assertSame(['name' => 'World'], $line['context']);
+    }
+
+    protected function getAbstractLogger(?string $level = null, array $config = []): AbstractLogger
+    {
+        return new class($level ?? LogLevel::DEBUG, $config) extends AbstractLogger {
+            protected function write(string $line)
+            {
+            }
+        };
     }
 }

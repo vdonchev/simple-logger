@@ -59,12 +59,12 @@ abstract class AbstractLogger extends \Psr\Log\AbstractLogger
         $this->config = array_merge(self::CONFIG, $config);
     }
 
-    public function log($level, $message, array $context = [])
+    public function log($level, string|\Stringable $message, array $context = []): void
     {
         $this->validateLevelName($level);
 
         if (!$this->minLevelReached($level)) {
-            return null;
+            return;
         }
 
         $context = $this->validateContextExceptions($context);

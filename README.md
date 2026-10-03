@@ -5,6 +5,8 @@ logging library.
 
 ## Installation
 
+Requires PHP 8.4.1+ and `psr/log` 3.x.
+
 `composer require donchev/simple-logger`
 
 ## Simple Usage
